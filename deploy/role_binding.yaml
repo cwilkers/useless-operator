@@ -1,0 +1,11 @@
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: useless-operator
+subjects:
+- kind: ServiceAccount
+  name: useless-operator
+roleRef:
+  kind: Role
+  name: useless-operator
+  apiGroup: rbac.authorization.k8s.io
