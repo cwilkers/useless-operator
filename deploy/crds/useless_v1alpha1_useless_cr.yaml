@@ -1,0 +1,6 @@
+apiVersion: useless.cwilkers/v1alpha1
+kind: Useless
+metadata:
+  name: example-useless
+spec:
+  size: 2
