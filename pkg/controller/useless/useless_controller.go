@@ -98,7 +98,6 @@ func (r *ReconcileUseless) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-
 	// Check if this deployment already exists
 	found := &appsv1.Deployment{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, found)
@@ -112,8 +111,8 @@ func (r *ReconcileUseless) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{}, err
 		}
 
-		// Deployment created successfully - return and requeue
-                return reconcile.Result{Requeue: true}, nil
+		// Deployment created successfully - return
+                return reconcile.Result{}, nil
 	} else if err != nil {
                 reqLogger.Error(err, "Failed to get Deployment")
 		return reconcile.Result{}, err
@@ -122,14 +121,16 @@ func (r *ReconcileUseless) Reconcile(request reconcile.Request) (reconcile.Resul
         // Ensure the deployment size is the same as the spec
         size := instance.Spec.Size
         if *found.Spec.Replicas != size {
+		reqLogger.Info("Reconciling Deployment replicas to CR size")
                 found.Spec.Replicas = &size
                 err = r.client.Update(context.TODO(), found)
                 if err != nil {
                         reqLogger.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
                         return reconcile.Result{}, err
                 }
-                // Spec updated - return and requeue
-                return reconcile.Result{RequeueAfter: time.Second*5}, nil
+                time.Sleep(time.Second*5)
+                // Deployment updated, requeue to get list of pods in a minute
+                return reconcile.Result{RequeueAfter: time.Minute}, nil
         }
 
         // Update the Useless CR status with pod names
@@ -145,26 +146,30 @@ func (r *ReconcileUseless) Reconcile(request reconcile.Request) (reconcile.Resul
 
         // Update status.Nodes if needed
         if !reflect.DeepEqual(podNames, instance.Status.Nodes) {
+		reqLogger.Info("Setting status.nodes to current pod list")
                 instance.Status.Nodes = podNames
                 err := r.client.Status().Update(context.TODO(), instance)
                 if err != nil {
                         reqLogger.Error(err, "Failed to update Useless status")
                         return reconcile.Result{}, err
                 }
-                return reconcile.Result{RequeueAfter: time.Second*5}, nil
+                time.Sleep(time.Second*5)
+                return reconcile.Result{}, nil
         }
 
         // Now that Deployment has been reconciled, reset the CR's size to zero if necessary to shut off
         // useless machine
 
         if size > 0 {
+		reqLogger.Info("Zero-ing out CR size param")
                 instance.Spec.Size = 0
                 err := r.client.Update(context.TODO(), instance)
                 if err != nil {
                         reqLogger.Error(err, "Failed to update Useless spec.size")
                         return reconcile.Result{}, err
                 }
-                return reconcile.Result{RequeueAfter: time.Second*3}, nil
+                time.Sleep(time.Second*5)
+                return reconcile.Result{}, nil
         }
 
         return reconcile.Result{}, nil
